@@ -1,0 +1,18 @@
+{
+  "name": "client-scraper",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "pnpm --filter web build",
+    "deploy:web": "pnpm --filter web run deploy",
+    "dev:worker": "pnpm --filter worker dev",
+    "start:worker": "pnpm --filter worker start",
+    "db:schema": "wrangler d1 execute client-scraper-db --file=./schema.sql"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "puppeteer"]
+  }
+}

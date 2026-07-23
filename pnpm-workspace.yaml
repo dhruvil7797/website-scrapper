@@ -1,0 +1,13 @@
+packages:
+  - 'packages/*'
+  - 'shared'
+
+allowBuilds:
+  esbuild: false
+  puppeteer: false
+  sharp: false
+  workerd: false
+
+onlyBuiltDependencies:
+  - esbuild
+  - puppeteer

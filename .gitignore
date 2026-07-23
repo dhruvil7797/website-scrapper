@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.cache/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.local
+.env.production
+.dev.vars
+
+# Cloudflare
+.wrangler/
+.mf/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+._*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Generated/temp
+/tmp/
+
+# Test output
+coverage/
+.nyc_output/
+
+# Agent configs (local-only)
+.claude/
+.agents/
+skills-lock.json
