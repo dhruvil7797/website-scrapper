@@ -36,12 +36,12 @@ ${senderContext}
 
 WRITING RULES — these are non-negotiable:
 1. MAX 280 characters. Every character counts. No filler words.
-2. First 40 characters must hook — lead with THEIR business name or a specific fact about them
+2. First 40 characters must hook — lead with THEIR business name or a specific fact
 3. Use their owner name if available, otherwise their business name
 4. ONE clear ask at the end (call, text back, or visit link)
-5. Sound like a real person texting a business owner, not a marketer
-6. DO NOT use: "Hi there", "I noticed", exclamation marks, or emojis
-7. Reference ONE specific thing about their business (rating, location, missing website)
+5. Write like you're texting a friend. Simple words. Short sentences.
+6. DO NOT use: "Hi there", "I noticed", exclamation marks, emojis, "potential leads", "currently", "specialize"
+7. Reference ONE specific thing about their business (rating, location, broken site)
 8. Include the portfolio link only if it fits within the character limit
 
 GOOD SMS EXAMPLES:
@@ -69,21 +69,29 @@ CONVERSION FRAMEWORK — follow this structure:
 4. CTA (1 sentence): Soft ask. Not "buy now" — ask for a conversation. "Would a quick call be worth it?" or "Open to seeing what this could look like?"
 
 WRITING RULES — these are non-negotiable:
-1. Under 150 words total. Short paragraphs (2-3 sentences max each). White space matters.
-2. Subject line: 5-8 words, specific to their business, no clickbait, no caps, no "Quick question"
-3. Open with "Hi [owner name]" or "Hi [business name] team" — never "Dear", never "Hello", never "I hope this finds you well"
-4. Write like a human who actually visited their website and cares, not like a marketer running a campaign
-5. Use their actual numbers — rating, review count, PageSpeed score, load time. Specificity = credibility.
-6. ONE clear CTA. Not two. Not "check my site and also call me." Pick one.
-7. Sign off with just: name, company, email. No phone, no "Best regards", no "Looking forward to hearing from you."
-8. Do NOT use: "I stumbled upon", "I couldn't help but notice", "In today's digital world", "leverage", "optimize", "synergy", or any marketing buzzwords
-9. The email should feel like it took 3 minutes to write personally, even though it didn't
+1. Under 120 words total. Short paragraphs (1-2 sentences each). Lots of white space.
+2. Subject line: 5-8 words, specific to their business, no clickbait, no caps
+3. Open with "Hi [owner name]" or "Hi [business name] team" — never "Dear", never "Hello"
+4. WRITE AT A GRADE 6 READING LEVEL. Use simple, everyday words. No business jargon.
+   - Say "broken" not "suspension error"
+   - Say "losing customers" not "losing potential leads to competitors"
+   - Say "people" not "residents"
+   - Say "shows" not "demonstrates" or "indicates"
+   - Say "fix" not "resolve" or "address"
+   - Say "call" not "conversation" or "discussion"
+   - Say "looks great" not "high-performing"
+   - NEVER use: "leverage", "optimize", "ensure", "utilize", "synergy", "specialize in", "high-performing", "potential leads", "currently", "clearly"
+5. Write like you're texting a friend who owns a business, not writing a business letter
+6. Use their actual numbers — rating, review count, PageSpeed score, load time
+7. ONE clear CTA at the end. Keep it casual: "Worth a quick call?" or "Mind if I show you?"
+8. Sign off with just: first name, company, email. Nothing else.
+9. Read the draft out loud — if any sentence sounds like it came from a marketing email, rewrite it in plain English
 
-BAD EXAMPLE (generic, wordy, no specifics):
-"I noticed your business could benefit from a website refresh. In today's digital landscape, having a strong online presence is crucial. We offer affordable web design solutions..."
+BAD EXAMPLE (too formal, jargon-heavy):
+"Your online presence is currently experiencing technical difficulties. Every hour that page stays down, you are losing potential leads to competitors who show up when residents search for emergency plumbing services. A broken site tells customers you are no longer in business."
 
-GOOD EXAMPLE (specific, concise, human):
-"Hi John, 4.7 stars across 89 reviews — your plumbing customers clearly trust you. But your website scored 31/100 on Google's speed test. That means about half the people who find you on Google leave before your site loads. I rebuild sites for plumbers in Austin that score 90+ and load in under 2 seconds. Here's a recent example: [link]. Worth a 5-minute call to see what the difference would look like?"
+GOOD EXAMPLE (simple, human, conversational):
+"Your website is showing an error page right now. When someone in Burnaby Googles 'plumber near me' and lands on a broken page, they just call the next one. With 4.9 stars and 102 reviews, you deserve a site that actually works for you."
 
 Return ONLY a JSON object with two fields:
 {"subject": "short specific subject", "body": "plain text body with newlines between paragraphs"}`;
