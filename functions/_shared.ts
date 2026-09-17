@@ -5,6 +5,8 @@ export interface Env {
   ADMIN_PASSWORD: string;
   RESEND_API_KEY: string;
   GOOGLE_API_KEY: string;
+  TWILIO_ACCOUNT_SID: string;
+  TWILIO_AUTH_TOKEN: string;
 }
 
 type CFContext = EventContext<Env, string, unknown>;

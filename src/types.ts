@@ -55,6 +55,8 @@ export interface Prospect {
   last_emailed_at: string | null;
   email_count: number;
   template_used: string | null;
+  sms_sent_at: string | null;
+  sms_count: number;
   created_at: string;
   updated_at: string;
   niche_name?: string;
@@ -86,6 +88,19 @@ export interface EmailLogEntry {
   resend_id: string | null;
 }
 
+export interface SmsLogEntry {
+  id: string;
+  prospect_id: string;
+  template_id: string | null;
+  to_phone: string;
+  from_phone: string;
+  body: string;
+  sent_at: string;
+  status: string;
+  error_message: string | null;
+  twilio_sid: string | null;
+}
+
 export interface Settings {
   sending_email: string;
   reply_to_email: string;
@@ -95,6 +110,7 @@ export interface Settings {
   sender_name: string;
   company_phone: string;
   company_address: string;
+  twilio_phone_number: string;
   [key: string]: string;
 }
 

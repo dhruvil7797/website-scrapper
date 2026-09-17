@@ -5,32 +5,32 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const authErr = requireAuth(context);
   if (authErr) return authErr;
 
-  const { prospect_id, template_id, subject, body_html, body_text } = await context.request.json() as {
+  const body = await context.request.json() as {
     prospect_id: string;
     template_id: string | null;
+    to_email: string;
+    from_email?: string;
+    reply_to_email?: string;
+    sender_name?: string;
     subject: string;
     body_html: string;
     body_text: string;
   };
 
-  if (!prospect_id || !subject || !body_html) {
-    return error('prospect_id, subject, and body_html are required');
+  if (!body.to_email || !body.subject || !body.body_html) {
+    return error('to_email, subject, and body_html are required');
   }
 
-  // Get prospect
-  const prospect = await context.env.DB.prepare('SELECT * FROM prospects WHERE id = ?').bind(prospect_id).first<{ email: string; business_name: string }>();
-  if (!prospect || !prospect.email) return error('Prospect not found or has no email', 404);
-
-  // Get sending settings
+  // Get sending settings for defaults
   const settingsRows = await context.env.DB.prepare('SELECT key, value FROM settings').all();
   const settings: Record<string, string> = {};
   for (const row of settingsRows.results as Array<{ key: string; value: string }>) {
     settings[row.key] = row.value;
   }
 
-  const fromEmail = settings.sending_email || 'hello@cloudgenz.com';
-  const replyTo = settings.reply_to_email || fromEmail;
-  const senderName = settings.sender_name || 'CloudGenZ';
+  const fromEmail = body.from_email || settings.sending_email || 'hello@cloudgenz.com';
+  const replyTo = body.reply_to_email || settings.reply_to_email || fromEmail;
+  const senderName = body.sender_name || settings.sender_name || 'CloudGenZ';
 
   // Send via Resend
   let resendId = '';
@@ -46,11 +46,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       },
       body: JSON.stringify({
         from: `${senderName} <${fromEmail}>`,
-        to: [prospect.email],
+        to: [body.to_email],
         reply_to: replyTo,
-        subject,
-        html: body_html,
-        text: body_text,
+        subject: body.subject,
+        html: body.body_html,
+        text: body.body_text,
       }),
     });
 
@@ -72,23 +72,19 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   await context.env.DB.prepare(
     `INSERT INTO email_log (id, prospect_id, template_id, to_address, subject, body_preview, status, error_message, resend_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(logId, prospect_id, template_id, prospect.email, subject, body_text.substring(0, 200), status, errorMessage || null, resendId || null).run();
+  ).bind(logId, body.prospect_id, body.template_id, body.to_email, body.subject, body.body_text.substring(0, 200), status, errorMessage || null, resendId || null).run();
 
   // Update prospect
-  if (status === 'sent') {
+  if (body.prospect_id && status === 'sent') {
     await context.env.DB.prepare(
-      `UPDATE prospects SET status = 'contacted', last_emailed_at = datetime('now'), email_count = email_count + 1, template_used = ?, updated_at = datetime('now') WHERE id = ?`
-    ).bind(template_id, prospect_id).run();
+      `UPDATE prospects SET status = CASE WHEN status = 'new' THEN 'contacted' ELSE status END, last_emailed_at = datetime('now'), email_count = email_count + 1, template_used = ?, updated_at = datetime('now') WHERE id = ?`
+    ).bind(body.template_id, body.prospect_id).run();
 
-    // Update template usage count
-    if (template_id) {
-      await context.env.DB.prepare(`UPDATE email_templates SET usage_count = usage_count + 1 WHERE id = ?`).bind(template_id).run();
+    if (body.template_id) {
+      await context.env.DB.prepare('UPDATE email_templates SET usage_count = usage_count + 1 WHERE id = ?').bind(body.template_id).run();
     }
   }
 
-  if (status === 'failed') {
-    return error(errorMessage, 500);
-  }
-
+  if (status === 'failed') return error(errorMessage, 500);
   return json({ sent: true, resend_id: resendId, log_id: logId });
 };

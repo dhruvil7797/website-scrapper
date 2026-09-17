@@ -62,6 +62,8 @@ CREATE TABLE prospects (
   last_emailed_at TEXT,
   email_count INTEGER DEFAULT 0,
   template_used TEXT,
+  sms_sent_at TEXT,
+  sms_count INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -101,6 +103,22 @@ CREATE TABLE email_log (
 );
 
 CREATE INDEX idx_email_log_prospect ON email_log(prospect_id);
+
+-- SMS Log
+CREATE TABLE sms_log (
+  id TEXT PRIMARY KEY,
+  prospect_id TEXT NOT NULL REFERENCES prospects(id),
+  template_id TEXT,
+  to_phone TEXT NOT NULL,
+  from_phone TEXT NOT NULL,
+  body TEXT NOT NULL,
+  sent_at TEXT DEFAULT (datetime('now')),
+  status TEXT DEFAULT 'sent',
+  error_message TEXT,
+  twilio_sid TEXT
+);
+
+CREATE INDEX idx_sms_log_prospect ON sms_log(prospect_id);
 
 -- Settings
 CREATE TABLE settings (

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
-import type { Prospect, Niche, Campaign, EmailLogEntry } from '@/types';
+import type { Prospect, Niche, Campaign, EmailLogEntry, SmsLogEntry } from '@/types';
 
 interface EditForm {
   business_name: string; phone: string; email: string; website_url: string;
@@ -19,6 +19,7 @@ export default function Prospects() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Prospect | null>(null);
   const [emailHistory, setEmailHistory] = useState<EmailLogEntry[]>([]);
+  const [smsHistory, setSmsHistory] = useState<SmsLogEntry[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProspect, setEditingProspect] = useState<EditForm | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export default function Prospects() {
 
   const loadEmailHistory = (id: string) => {
     api.get<EmailLogEntry[]>(`/prospects/${id}/emails`).then(setEmailHistory).catch(() => setEmailHistory([]));
+    api.get<SmsLogEntry[]>(`/prospects/${id}/sms`).then(setSmsHistory).catch(() => setSmsHistory([]));
   };
 
   const selectDetail = (p: Prospect) => {
@@ -280,8 +282,9 @@ export default function Prospects() {
                   <td className="px-3 py-3 text-center">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === 'new' ? 'bg-blue-100 text-blue-700' : p.status === 'contacted' ? 'bg-yellow-100 text-yellow-700' : p.status === 'replied' ? 'bg-green-100 text-green-700' : p.status === 'won' ? 'bg-green-200 text-green-800' : p.status === 'lost' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
                   </td>
-                  <td className="px-3 py-3 text-right space-x-2" onClick={e => e.stopPropagation()}>
-                    {p.email && <Link to={`/compose/${p.id}`} className="text-blue-600 hover:text-blue-700 text-xs">✉️</Link>}
+                  <td className="px-3 py-3 text-right space-x-1" onClick={e => e.stopPropagation()}>
+                    <Link to={`/compose/${p.id}?mode=email`} className="text-blue-600 hover:text-blue-700 text-xs">✉️</Link>
+                    <Link to={`/compose/${p.id}?mode=sms`} className="text-green-600 hover:text-green-700 text-xs">📱</Link>
                     <button onClick={() => startEdit(p)} className="text-gray-400 hover:text-gray-600 text-xs">✏️</button>
                     <button onClick={() => deleteProspect(p.id)} className="text-red-400 hover:text-red-600 text-xs">🗑️</button>
                   </td>
@@ -415,10 +418,15 @@ export default function Prospects() {
           </div>
 
           {detail.email && (
-            <Link to={`/compose/${detail.id}`} className="block w-full text-center bg-blue-600 text-white py-2 rounded text-sm font-medium hover:bg-blue-700">
-              Compose Email
+            <Link to={`/compose/${detail.id}?mode=email`} className="block w-full text-center bg-blue-600 text-white py-2 rounded text-sm font-medium hover:bg-blue-700">
+              ✉️ Compose Email
             </Link>
           )}
+
+          <div className="flex gap-2">
+            <Link to={`/compose/${detail.id}?mode=email`} className="flex-1 text-center bg-blue-50 text-blue-700 py-1.5 rounded text-xs font-medium hover:bg-blue-100">✉️ Email</Link>
+            <Link to={`/compose/${detail.id}?mode=sms`} className="flex-1 text-center bg-green-50 text-green-700 py-1.5 rounded text-xs font-medium hover:bg-green-100">📱 SMS</Link>
+          </div>
 
           {/* Email history */}
           {emailHistory.length > 0 && (
@@ -432,6 +440,25 @@ export default function Prospects() {
                       <span className={e.status === 'sent' ? 'text-green-600' : 'text-red-500'}>{e.status}</span>
                     </div>
                     <p className="text-gray-400 mt-0.5">{new Date(e.sent_at).toLocaleDateString()}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SMS history */}
+          {smsHistory.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-1">SMS History</p>
+              <div className="space-y-2">
+                {smsHistory.map(s => (
+                  <div key={s.id} className="text-xs border border-green-100 rounded p-2">
+                    <div className="flex justify-between">
+                      <span className="font-medium truncate">📱 {s.to_phone}</span>
+                      <span className={s.status === 'sent' ? 'text-green-600' : 'text-red-500'}>{s.status}</span>
+                    </div>
+                    <p className="text-gray-500 mt-0.5 truncate">{s.body.substring(0, 80)}...</p>
+                    <p className="text-gray-400 mt-0.5">{new Date(s.sent_at).toLocaleDateString()}</p>
                   </div>
                 ))}
               </div>
