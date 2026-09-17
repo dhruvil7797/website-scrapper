@@ -298,7 +298,7 @@ export default function Prospects() {
 
       {/* Detail panel */}
       {detail && (
-        <div className="w-80 flex-shrink-0 bg-white rounded-lg border border-gray-200 p-5 h-fit sticky top-6 space-y-4">
+        <div className="w-80 flex-shrink-0 bg-white rounded-lg border border-gray-200 p-5 sticky top-6 space-y-4 max-h-[calc(100vh-6rem)] overflow-y-auto">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-900 text-lg leading-tight">{detail.business_name}</h2>
             <button onClick={() => setDetail(null)} className="text-gray-400 hover:text-gray-600">✕</button>
