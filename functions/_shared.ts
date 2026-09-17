@@ -7,6 +7,7 @@ export interface Env {
   GOOGLE_API_KEY: string;
   TWILIO_ACCOUNT_SID: string;
   TWILIO_AUTH_TOKEN: string;
+  GEMINI_API_KEY: string;
 }
 
 type CFContext = EventContext<Env, string, unknown>;

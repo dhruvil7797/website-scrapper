@@ -36,6 +36,8 @@ export default function Compose() {
   const [sentMode, setSentMode] = useState<Mode>('email');
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [aiInstruction, setAiInstruction] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     if (!prospectId) return;
@@ -111,6 +113,24 @@ export default function Compose() {
     setSending(false);
   };
 
+  const handleAiDraft = async () => {
+    if (!aiInstruction || !prospect) return;
+    setAiLoading(true); setError('');
+    try {
+      const result = await api.post<{ subject?: string; body: string }>('/ai-draft', {
+        prospect_id: prospect.id, instruction: aiInstruction, mode,
+      });
+      if (mode === 'sms') {
+        setSmsBody(result.body);
+      } else {
+        if (result.subject) setSubject(result.subject);
+        setBodyText(result.body);
+        setBodyHtml(result.body.replace(/\n/g, '<br>'));
+      }
+    } catch (err) { setError(err instanceof Error ? err.message : 'AI draft failed'); }
+    setAiLoading(false);
+  };
+
   if (!prospect || !settings) return <div className="text-gray-400">Loading...</div>;
 
   if (sent) {
@@ -168,6 +188,34 @@ export default function Compose() {
               <option value="">Select template...</option>
               {templates.map(t => <option key={t.id} value={t.id}>{t.name} ({t.category})</option>)}
             </select>
+          </div>
+
+          {/* AI Draft Assistant */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">🤖</span>
+              <h3 className="font-medium text-gray-900 text-sm">AI Draft Assistant</h3>
+              <span className="text-xs text-gray-400">powered by Gemini</span>
+            </div>
+            <div className="flex gap-2">
+              <textarea
+                value={aiInstruction}
+                onChange={e => setAiInstruction(e.target.value)}
+                placeholder={mode === 'sms'
+                  ? "e.g. Their website is down, mention urgency. Keep it casual."
+                  : "e.g. Their website is really slow and outdated. Mention their great reviews but poor site speed. Friendly but direct tone."}
+                rows={2}
+                className="flex-1 px-3 py-2 border border-purple-200 rounded-md text-sm bg-white placeholder:text-gray-400"
+              />
+              <button
+                onClick={handleAiDraft}
+                disabled={aiLoading || !aiInstruction}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 disabled:opacity-50 whitespace-nowrap self-end"
+              >
+                {aiLoading ? '✨ Generating...' : '✨ Generate'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">Describe the tone and angle. AI uses all prospect data (rating, PageSpeed, location) to write a personalized {mode === 'sms' ? 'SMS' : 'email'}.</p>
           </div>
 
           {mode === 'email' ? (
