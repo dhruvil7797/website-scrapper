@@ -21,12 +21,12 @@ function buildPrompt(mode: 'email' | 'sms', instruction: string, prospect: Recor
   ].filter(Boolean).join('\n');
 
   const senderContext = `Sender name: ${settings.sender_name || 'Dhruvil'}\nCompany: ${settings.company_name || 'CloudGenZ'}\nEmail: ${settings.sending_email || 'hello@cloudgenz.com'}\nPortfolio link: ${settings.portfolio_link || ''}`;
+  const nicheStr = prospect.niche_name ? ` (${prospect.niche_name})` : '';
 
   if (mode === 'sms') {
-    return `You are writing a cold outreach SMS to a local business owner about web design services.
+    return `You are writing a cold outreach SMS to a local business owner${nicheStr} about web design services.
 
-USER'S INSTRUCTION (follow this closely for tone, angle, and what to emphasize):
-${instruction}
+USER'S INSTRUCTION: ${instruction}
 
 PROSPECT DATA:
 ${prospectContext}
@@ -34,27 +34,26 @@ ${prospectContext}
 SENDER:
 ${senderContext}
 
-WRITING RULES — these are non-negotiable:
-1. MAX 280 characters. Every character counts. No filler words.
-2. First 40 characters must hook — lead with THEIR business name or a specific fact
-3. Use their owner name if available, otherwise their business name
-4. ONE clear ask at the end (call, text back, or visit link)
-5. Write like you're texting a friend. Simple words. Short sentences.
-6. DO NOT use: "Hi there", "I noticed", exclamation marks, emojis, "potential leads", "currently", "specialize"
-7. Reference ONE specific thing about their business (rating, location, broken site)
-8. Include the portfolio link only if it fits within the character limit
+RULES:
+1. MAX 280 characters total
+2. Lead with THEIR business name or a specific fact about them
+3. Use owner name if available
+4. ONE ask at the end (call, text back, or visit link)
+5. Write like texting a friend. Simple words. Short sentences.
+6. NEVER use: "Hi there", "I noticed", "potential leads", "currently", "specialize", "leverage"
+7. If space allows, mention ONE feature that would help their type of business. For example:
+   - Plumber → online booking, emergency call button
+   - Barber → appointment scheduling, gallery of cuts
+   - Dentist → online booking, insurance info page
+   - Restaurant → online menu, reservation system
+   Explain what it does for them in a few words, not just the feature name.
 
-GOOD SMS EXAMPLES:
-- "Hey Mike, your 4.8 stars at Smith Plumbing caught my eye. Your website loads in 20s though — customers are leaving before they can call. Quick fix possible. Mind if I share details? -Dhruvil"
-- "Miller Plumbing has great reviews but no website. 60% of customers search online before calling a plumber. I build sites for plumbing businesses in Burnaby — worth a quick call? -Dhruvil"
-
-Return ONLY a JSON object: {"body": "the sms text"}`;
+Return ONLY: {"body": "the sms text"}`;
   }
 
-  return `You are writing a cold outreach email to a local business owner about web design services.
+  return `You are writing a cold outreach email to a local business owner${nicheStr} about web design services.
 
-USER'S INSTRUCTION (follow this closely for tone, angle, and what to emphasize):
-${instruction}
+USER'S INSTRUCTION: ${instruction}
 
 PROSPECT DATA:
 ${prospectContext}
@@ -62,39 +61,59 @@ ${prospectContext}
 SENDER:
 ${senderContext}
 
-CONVERSION FRAMEWORK — follow this structure:
-1. HOOK (1 sentence): Reference something specific about THEIR business. Their rating, their city, their industry, or something you noticed about their website. Make them feel seen, not targeted.
-2. PROBLEM (2-3 sentences): Connect their specific situation to a real business impact. Use their data — if PageSpeed is 38/100, say that. If they have no website, say what they're missing. Be specific, not generic.
-3. PROOF (1 sentence): Mention you specialize in their industry. Link to portfolio.
-4. CTA (1 sentence): Soft ask. Not "buy now" — ask for a conversation. "Would a quick call be worth it?" or "Open to seeing what this could look like?"
+EMAIL STRUCTURE — follow this order:
+1. HOOK (1 sentence): Something specific about THEIR business — rating, city, what you saw.
+2. PROBLEM (1-2 sentences): What's wrong and how it hurts them. Use their actual numbers.
+3. FEATURES (2-3 short bullet points): Based on their industry, suggest 2-3 website features that would actually help their business. For each one, say what it is AND what it does for them in simple words.
 
-WRITING RULES — these are non-negotiable:
-1. Under 120 words total. Short paragraphs (1-2 sentences each). Lots of white space.
-2. Subject line: 5-8 words, specific to their business, no clickbait, no caps
-3. Open with "Hi [owner name]" or "Hi [business name] team" — never "Dear", never "Hello"
-4. WRITE AT A GRADE 6 READING LEVEL. Use simple, everyday words. No business jargon.
-   - Say "broken" not "suspension error"
-   - Say "losing customers" not "losing potential leads to competitors"
-   - Say "people" not "residents"
-   - Say "shows" not "demonstrates" or "indicates"
-   - Say "fix" not "resolve" or "address"
-   - Say "call" not "conversation" or "discussion"
-   - Say "looks great" not "high-performing"
-   - NEVER use: "leverage", "optimize", "ensure", "utilize", "synergy", "specialize in", "high-performing", "potential leads", "currently", "clearly"
-5. Write like you're texting a friend who owns a business, not writing a business letter
-6. Use their actual numbers — rating, review count, PageSpeed score, load time
-7. ONE clear CTA at the end. Keep it casual: "Worth a quick call?" or "Mind if I show you?"
-8. Sign off with just: first name, company, email. Nothing else.
-9. Read the draft out loud — if any sentence sounds like it came from a marketing email, rewrite it in plain English
+   Think about what makes sense for a ${prospect.niche_name || 'local service'} business:
+   - Plumber → "Online booking — customers schedule a job without calling" / "Emergency call button — people with burst pipes reach you in one tap" / "Service area map — locals know you cover their neighborhood"
+   - Barber/Salon → "Appointment booking — no more phone tag or no-shows" / "Gallery of your work — your best cuts sell themselves" / "Price list — customers know what to expect before walking in"
+   - Dentist → "Online appointment form — patients book when they have a toothache at midnight" / "Insurance page — answers the #1 question every new patient has" / "Team photos — people want to see who's working on their teeth"
+   - Restaurant → "Menu page — 70% of diners check the menu before showing up" / "Online reservations — fill empty tables without picking up the phone" / "Hours + location on Google — so nobody shows up when you're closed"
+   - Auto Mechanic → "Online booking — customers schedule from the parking lot" / "Service list — people see you do brakes, not just oil changes" / "Review highlights — your 4.8 stars front and center"
+   - Cleaning → "Quote calculator — visitors type in their home size and get a price" / "Booking form — turn visitors into booked jobs"
+   - General → "Contact form — turn visitors into calls" / "Mobile-friendly design — most searches are from phones" / "Google Maps listing — show up in 'near me' searches"
 
-BAD EXAMPLE (too formal, jargon-heavy):
-"Your online presence is currently experiencing technical difficulties. Every hour that page stays down, you are losing potential leads to competitors who show up when residents search for emergency plumbing services. A broken site tells customers you are no longer in business."
+   Pick features that fit THIS business. Don't copy the examples word-for-word. Adapt them.
 
-GOOD EXAMPLE (simple, human, conversational):
-"Your website is showing an error page right now. When someone in Burnaby Googles 'plumber near me' and lands on a broken page, they just call the next one. With 4.9 stars and 102 reviews, you deserve a site that actually works for you."
+4. PROOF (1 sentence): Portfolio link.
+5. CTA (1 sentence): Casual ask. "Worth a quick call?" or "Mind if I show you?"
 
-Return ONLY a JSON object with two fields:
-{"subject": "short specific subject", "body": "plain text body with newlines between paragraphs"}`;
+WRITING RULES:
+1. Under 150 words. Short paragraphs. Lots of white space.
+2. Subject line: 5-8 words, about their business, no clickbait
+3. Open with "Hi [name]" — never "Dear" or "Hello"
+4. GRADE 6 READING LEVEL. Simple everyday words only.
+   - "broken" not "suspension error"
+   - "losing customers" not "losing potential leads"
+   - "people" not "residents"
+   - "fix" not "resolve"
+   - BANNED: "leverage", "optimize", "ensure", "utilize", "specialize in", "high-performing", "potential leads", "currently", "clearly", "synergy"
+5. Write like texting a friend who owns a business
+6. Use their actual numbers (rating, score, load time)
+7. Sign off: first name, company, email. Nothing else.
+8. Read it out loud. If it sounds like a marketing email, rewrite it simpler.
+
+GOOD EXAMPLE:
+"Hi John,
+
+4.7 stars and 89 reviews — your customers trust you. But your website takes 20 seconds to load on a phone. Most people give up after 3.
+
+A few things that could help:
+- Online booking — so customers schedule a job without calling
+- Emergency button — people with burst pipes reach you in one tap
+- Service area map — so locals know you cover their neighborhood
+
+Here's what that looks like: [portfolio link]
+
+Worth a quick call to chat about it?
+
+Dhruvil
+CloudGenZ
+hello@cloudgenz.com"
+
+Return ONLY: {"subject": "short subject", "body": "plain text with newlines"}`;
 }
 
 // POST /api/ai-draft — generate email/SMS draft using Gemini
@@ -111,13 +130,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     if (!instruction) return error('instruction is required');
 
-    // Get prospect
     const prospect = await context.env.DB.prepare(
       'SELECT p.*, n.name as niche_name FROM prospects p LEFT JOIN niches n ON p.niche_id = n.id WHERE p.id = ?'
     ).bind(prospect_id).first();
     if (!prospect) return error('Prospect not found', 404);
 
-    // Get settings
     const settingsRows = await context.env.DB.prepare('SELECT key, value FROM settings').all();
     const settings: Record<string, string> = {};
     for (const row of settingsRows.results as Array<{ key: string; value: string }>) {
@@ -126,7 +143,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     const prompt = buildPrompt(mode, instruction, prospect as Record<string, unknown>, settings);
 
-    // Call Gemini API
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${context.env.GEMINI_API_KEY}`,
       {
@@ -152,18 +168,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) return error('Gemini returned no content');
 
-    // Parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return error('Could not parse AI response');
 
     const parsed = JSON.parse(jsonMatch[0]) as { subject?: string; body?: string };
     if (!parsed.body) return error('AI response missing body');
 
-    return json({
-      subject: parsed.subject || '',
-      body: parsed.body,
-      model: MODEL,
-    });
+    return json({ subject: parsed.subject || '', body: parsed.body, model: MODEL });
   } catch (e) {
     if (e instanceof Error && e.name === 'TimeoutError') {
       return error('AI request timed out — try again', 504);
