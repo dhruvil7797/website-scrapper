@@ -1,18 +1,32 @@
 {
   "name": "client-scraper",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev:web": "pnpm --filter web dev",
-    "build:web": "pnpm --filter web build",
-    "deploy:web": "pnpm --filter web run deploy",
-    "dev:worker": "pnpm --filter worker dev",
-    "start:worker": "pnpm --filter worker start",
-    "db:schema": "wrangler d1 execute client-scraper-db --file=./schema.sql"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "wrangler pages dev dist",
+    "deploy": "npm run build && npx wrangler pages deploy dist",
+    "db:init": "wrangler d1 execute client-scraper-db --file=./schema.sql --remote",
+    "db:seed-niches": "wrangler d1 execute client-scraper-db --file=./seed-niches.sql --remote",
+    "db:seed-templates": "wrangler d1 execute client-scraper-db --file=./seed-templates.sql --remote",
+    "db:reset": "npm run db:init && npm run db:seed-niches && npm run db:seed-templates"
   },
-  "engines": {
-    "node": ">=20"
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "puppeteer"]
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240806.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.41",
+    "tailwindcss": "^3.4.9",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0",
+    "wrangler": "^3.70.0"
   }
 }
