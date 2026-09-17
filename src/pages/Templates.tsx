@@ -15,7 +15,7 @@ const PLACEHOLDERS = [
   'business_name', 'owner_name', 'city', 'state', 'niche', 'phone',
   'website_url', 'google_rating', 'review_count', 'pagespeed_score', 'pagespeed_url',
   'fcp', 'lcp', 'tbt', 'cls',
-  'portfolio_link', 'sender_name', 'sending_email', 'company_name',
+  'portfolio_link', 'calendly_link', 'sender_name', 'sending_email', 'company_name',
 ];
 
 const SAMPLE_DATA: Record<string, string> = {
@@ -25,6 +25,7 @@ const SAMPLE_DATA: Record<string, string> = {
   pagespeed_url: 'https://pagespeed.web.dev/analysis/https-smithplumbing-com/abc123?form_factor=mobile',
   fcp: '10.4 s', lcp: '20.2 s', tbt: '740 ms', cls: '0',
   portfolio_link: 'https://cloudgenz.com/portfolio', sender_name: 'Dhruvil',
+  calendly_link: 'https://calendly.com/cloudgenz/30min-discovery-with-dhruvil',
   sending_email: 'hello@cloudgenz.com', company_name: 'CloudGenZ',
 };
 

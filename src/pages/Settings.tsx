@@ -12,6 +12,7 @@ const FIELDS: { key: keyof SettingsType; label: string; type?: string; placehold
   { key: 'company_address', label: 'Company Address', placeholder: '123 Main St, Austin TX' },
   { key: 'portfolio_link', label: 'Portfolio/Sample Site Link', placeholder: 'https://cloudgenz.com/portfolio' },
   { key: 'twilio_phone_number', label: 'Twilio Phone Number (SMS)', placeholder: '+18001234567' },
+  { key: 'calendly_link', label: 'Calendly Booking Link', placeholder: 'https://calendly.com/you/30min' },
 ];
 
 export default function Settings() {

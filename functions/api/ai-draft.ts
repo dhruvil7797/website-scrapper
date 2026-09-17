@@ -20,7 +20,7 @@ function buildPrompt(mode: 'email' | 'sms', instruction: string, prospect: Recor
     prospect.has_website === 0 ? `NOTE: This business has NO website at all` : null,
   ].filter(Boolean).join('\n');
 
-  const senderContext = `Sender name: ${settings.sender_name || 'Dhruvil'}\nCompany: ${settings.company_name || 'CloudGenZ'}\nEmail: ${settings.sending_email || 'hello@cloudgenz.com'}\nPortfolio link: ${settings.portfolio_link || ''}`;
+  const senderContext = `Sender name: ${settings.sender_name || 'Dhruvil'}\nCompany: ${settings.company_name || 'CloudGenZ'}\nEmail: ${settings.sending_email || 'hello@cloudgenz.com'}\nPortfolio link: ${settings.portfolio_link || ''}\nBooking link: ${settings.calendly_link || ''}`;
   const nicheStr = prospect.niche_name ? ` (${prospect.niche_name})` : '';
 
   if (mode === 'sms') {
@@ -78,7 +78,7 @@ EMAIL STRUCTURE — follow this order:
    Pick features that fit THIS business. Don't copy the examples word-for-word. Adapt them.
 
 4. PROOF (1 sentence): Portfolio link.
-5. CTA (1 sentence): Casual ask. "Worth a quick call?" or "Mind if I show you?"
+5. CTA (1 sentence): If a booking link is provided, use it: "Pick a time that works for you: [booking link]". If no booking link, use a soft ask: "Worth a quick call?"
 
 WRITING RULES:
 1. Under 150 words. Short paragraphs. Lots of white space.
@@ -107,7 +107,7 @@ A few things that could help:
 
 Here's what that looks like: [portfolio link]
 
-Worth a quick call to chat about it?
+Want to chat about it? Pick a time here: [booking link]
 
 Dhruvil
 CloudGenZ

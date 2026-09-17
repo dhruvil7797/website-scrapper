@@ -111,6 +111,7 @@ export interface Settings {
   company_phone: string;
   company_address: string;
   twilio_phone_number: string;
+  calendly_link: string;
   [key: string]: string;
 }
 

@@ -70,6 +70,7 @@ export default function Compose() {
       tbt: psData?.tbt?.replace(/\u00a0/g, ' ') || '', cls: psData?.cls || '',
       portfolio_link: settings.portfolio_link || '', sender_name: settings.sender_name || '',
       sending_email: fromEmail || settings.sending_email || '', company_name: settings.company_name || '',
+      calendly_link: settings.calendly_link || '',
     };
   };
 
