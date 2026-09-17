@@ -154,59 +154,17 @@ export default function Prospects() {
 
   const scoreColor = (s: number) => s >= 60 ? 'text-green-600' : s >= 30 ? 'text-yellow-600' : 'text-red-500';
 
-  // Prospect form (shared between add and edit)
-  const ProspectForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => (
-    <form onSubmit={onSubmit} className="bg-white rounded-lg border border-gray-200 p-5 mb-6 space-y-3">
-      <h3 className="font-medium text-gray-900">{isEdit ? 'Edit Prospect' : 'Add Prospect'}</h3>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {[
-          { key: 'business_name', label: 'Business Name*', required: true },
-          { key: 'owner_name', label: 'Owner Name' },
-          { key: 'email', label: 'Email' },
-          { key: 'phone', label: 'Phone' },
-          { key: 'website_url', label: 'Website URL' },
-          { key: 'city', label: 'City' },
-          { key: 'state_province', label: 'State/Province' },
-          { key: 'postal_code', label: 'Postal Code' },
-          { key: 'address', label: 'Address' },
-        ].map(f => (
-          <div key={f.key}>
-            <label className="block text-xs text-gray-500 mb-1">{f.label}</label>
-            <input
-              value={(editingProspect as unknown as Record<string, string>)?.[f.key] || ''}
-              onChange={e => setEditingProspect({ ...editingProspect!, [f.key]: e.target.value })}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-              required={f.required}
-            />
-          </div>
-        ))}
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Niche</label>
-          <select value={editingProspect?.niche_id || ''} onChange={e => setEditingProspect({ ...editingProspect!, niche_id: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm">
-            <option value="">None</option>
-            {niches.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
-          </select>
-        </div>
-        {!isEdit && (
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Campaign</label>
-            <select value={editingProspect?.campaign_id || ''} onChange={e => setEditingProspect({ ...editingProspect!, campaign_id: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm">
-              <option value="">None</option>
-              {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-        )}
-      </div>
-      <div>
-        <label className="block text-xs text-gray-500 mb-1">Notes</label>
-        <textarea value={editingProspect?.notes || ''} onChange={e => setEditingProspect({ ...editingProspect!, notes: e.target.value })} rows={2} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
-      </div>
-      <div className="flex gap-2">
-        <button type="submit" className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-blue-700">{isEdit ? 'Save' : 'Add'}</button>
-        <button type="button" onClick={() => { setShowAddForm(false); setEditingId(null); setEditingProspect(null); }} className="text-gray-500 px-3 py-1.5 text-sm">Cancel</button>
-      </div>
-    </form>
-  );
+  const formFields: { key: string; label: string; required?: boolean }[] = [
+    { key: 'business_name', label: 'Business Name*', required: true },
+    { key: 'owner_name', label: 'Owner Name' },
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'website_url', label: 'Website URL' },
+    { key: 'city', label: 'City' },
+    { key: 'state_province', label: 'State/Province' },
+    { key: 'postal_code', label: 'Postal Code' },
+    { key: 'address', label: 'Address' },
+  ];
 
   return (
     <div className="flex gap-6">
@@ -225,10 +183,47 @@ export default function Prospects() {
         </div>
 
         {/* Add form */}
-        {showAddForm && editingProspect && <ProspectForm onSubmit={handleAddProspect} isEdit={false} />}
+        {showAddForm && editingProspect && (
+          <form onSubmit={handleAddProspect} className="bg-white rounded-lg border border-gray-200 p-5 mb-6 space-y-3">
+            <h3 className="font-medium text-gray-900">Add Prospect</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {formFields.map(f => (
+                <div key={f.key}>
+                  <label className="block text-xs text-gray-500 mb-1">{f.label}</label>
+                  <input value={(editingProspect as unknown as Record<string, string>)[f.key] || ''} onChange={e => setEditingProspect({ ...editingProspect, [f.key]: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" required={f.required} />
+                </div>
+              ))}
+              <div><label className="block text-xs text-gray-500 mb-1">Niche</label><select value={editingProspect.niche_id} onChange={e => setEditingProspect({ ...editingProspect, niche_id: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"><option value="">None</option>{niches.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}</select></div>
+              <div><label className="block text-xs text-gray-500 mb-1">Campaign</label><select value={editingProspect.campaign_id} onChange={e => setEditingProspect({ ...editingProspect, campaign_id: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"><option value="">None</option>{campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+            </div>
+            <div><label className="block text-xs text-gray-500 mb-1">Notes</label><textarea value={editingProspect.notes} onChange={e => setEditingProspect({ ...editingProspect, notes: e.target.value })} rows={2} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" /></div>
+            <div className="flex gap-2">
+              <button type="submit" className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-blue-700">Add</button>
+              <button type="button" onClick={() => { setShowAddForm(false); setEditingProspect(null); }} className="text-gray-500 px-3 py-1.5 text-sm">Cancel</button>
+            </div>
+          </form>
+        )}
 
         {/* Edit form */}
-        {editingId && editingProspect && <ProspectForm onSubmit={handleEditProspect} isEdit={true} />}
+        {editingId && editingProspect && (
+          <form onSubmit={handleEditProspect} className="bg-white rounded-lg border border-gray-200 p-5 mb-6 space-y-3">
+            <h3 className="font-medium text-gray-900">Edit Prospect</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {formFields.map(f => (
+                <div key={f.key}>
+                  <label className="block text-xs text-gray-500 mb-1">{f.label}</label>
+                  <input value={(editingProspect as unknown as Record<string, string>)[f.key] || ''} onChange={e => setEditingProspect({ ...editingProspect, [f.key]: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" required={f.required} />
+                </div>
+              ))}
+              <div><label className="block text-xs text-gray-500 mb-1">Niche</label><select value={editingProspect.niche_id} onChange={e => setEditingProspect({ ...editingProspect, niche_id: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"><option value="">None</option>{niches.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}</select></div>
+            </div>
+            <div><label className="block text-xs text-gray-500 mb-1">Notes</label><textarea value={editingProspect.notes} onChange={e => setEditingProspect({ ...editingProspect, notes: e.target.value })} rows={2} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" /></div>
+            <div className="flex gap-2">
+              <button type="submit" className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-blue-700">Save</button>
+              <button type="button" onClick={() => { setEditingId(null); setEditingProspect(null); }} className="text-gray-500 px-3 py-1.5 text-sm">Cancel</button>
+            </div>
+          </form>
+        )}
 
         {/* Filters */}
         <div className="flex flex-wrap gap-2 mb-4">
