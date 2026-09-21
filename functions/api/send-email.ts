@@ -70,9 +70,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   // Log email
   const logId = nanoid();
   await context.env.DB.prepare(
-    `INSERT INTO email_log (id, prospect_id, template_id, to_address, subject, body_preview, status, error_message, resend_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(logId, body.prospect_id, body.template_id, body.to_email, body.subject, body.body_text.substring(0, 200), status, errorMessage || null, resendId || null).run();
+    `INSERT INTO email_log (id, prospect_id, template_id, to_address, subject, body_preview, body_html, body_text, status, error_message, resend_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(logId, body.prospect_id, body.template_id, body.to_email, body.subject, body.body_text.substring(0, 200), body.body_html, body.body_text, status, errorMessage || null, resendId || null).run();
 
   // Update prospect
   if (body.prospect_id && status === 'sent') {

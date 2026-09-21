@@ -67,9 +67,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   // Log email (no prospect_id)
   const logId = nanoid();
   await context.env.DB.prepare(
-    `INSERT INTO email_log (id, prospect_id, template_id, to_address, subject, body_preview, status, error_message, resend_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(logId, 'direct_' + nanoid(6), template_id || null, to_email, subject, body_text.substring(0, 200), status, errorMessage || null, resendId || null).run();
+    `INSERT INTO email_log (id, prospect_id, template_id, to_address, subject, body_preview, body_html, body_text, status, error_message, resend_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(logId, 'direct_' + nanoid(6), template_id || null, to_email, subject, body_text.substring(0, 200), body_html, body_text, status, errorMessage || null, resendId || null).run();
 
   if (template_id) {
     await context.env.DB.prepare('UPDATE email_templates SET usage_count = usage_count + 1 WHERE id = ?').bind(template_id).run();

@@ -82,6 +82,8 @@ export interface EmailLogEntry {
   to_address: string;
   subject: string;
   body_preview: string | null;
+  body_html: string | null;
+  body_text: string | null;
   sent_at: string;
   status: string;
   error_message: string | null;

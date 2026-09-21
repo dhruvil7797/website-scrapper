@@ -96,6 +96,8 @@ CREATE TABLE email_log (
   to_address TEXT NOT NULL,
   subject TEXT NOT NULL,
   body_preview TEXT,
+  body_html TEXT,
+  body_text TEXT,
   sent_at TEXT DEFAULT (datetime('now')),
   status TEXT DEFAULT 'sent',
   error_message TEXT,

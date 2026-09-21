@@ -26,6 +26,7 @@ export default function Prospects() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pageSpeedData, setPageSpeedData] = useState<{ score: number; fcp: string | null; lcp: string | null; cls: string | null; tbt: string | null; si: string | null; issues: string[]; report_url?: string } | null>(null);
   const [pageSpeedUrl, setPageSpeedUrl] = useState('');
+  const [expandedLog, setExpandedLog] = useState<string | null>(null);
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
@@ -429,12 +430,20 @@ export default function Prospects() {
               <p className="text-xs text-gray-500 mb-1">Email History</p>
               <div className="space-y-2">
                 {emailHistory.map(e => (
-                  <div key={e.id} className="text-xs border border-gray-100 rounded p-2">
+                  <div key={e.id} className="text-xs border border-gray-100 rounded p-2 cursor-pointer hover:bg-gray-50" onClick={() => setExpandedLog(expandedLog === e.id ? null : e.id)}>
                     <div className="flex justify-between">
                       <span className="font-medium truncate">{e.subject}</span>
                       <span className={e.status === 'sent' ? 'text-green-600' : 'text-red-500'}>{e.status}</span>
                     </div>
-                    <p className="text-gray-400 mt-0.5">{new Date(e.sent_at).toLocaleDateString()}</p>
+                    <div className="flex justify-between mt-0.5">
+                      <span className="text-gray-400">{e.to_address}</span>
+                      <span className="text-gray-400">{new Date(e.sent_at).toLocaleDateString()}</span>
+                    </div>
+                    {expandedLog === e.id && (
+                      <div className="mt-2 pt-2 border-t border-gray-100">
+                        <pre className="whitespace-pre-wrap text-gray-600 text-xs leading-relaxed">{e.body_text || e.body_preview || 'No body stored'}</pre>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -447,12 +456,17 @@ export default function Prospects() {
               <p className="text-xs text-gray-500 mb-1">SMS History</p>
               <div className="space-y-2">
                 {smsHistory.map(s => (
-                  <div key={s.id} className="text-xs border border-green-100 rounded p-2">
+                  <div key={s.id} className="text-xs border border-green-100 rounded p-2 cursor-pointer hover:bg-green-50" onClick={() => setExpandedLog(expandedLog === s.id ? null : s.id)}>
                     <div className="flex justify-between">
                       <span className="font-medium truncate">📱 {s.to_phone}</span>
                       <span className={s.status === 'sent' ? 'text-green-600' : 'text-red-500'}>{s.status}</span>
                     </div>
-                    <p className="text-gray-500 mt-0.5 truncate">{s.body.substring(0, 80)}...</p>
+                    <p className="text-gray-500 mt-0.5 truncate">{expandedLog === s.id ? '' : s.body.substring(0, 80) + '...'}</p>
+                    {expandedLog === s.id && (
+                      <div className="mt-1">
+                        <pre className="whitespace-pre-wrap text-gray-600 text-xs leading-relaxed">{s.body}</pre>
+                      </div>
+                    )}
                     <p className="text-gray-400 mt-0.5">{new Date(s.sent_at).toLocaleDateString()}</p>
                   </div>
                 ))}
