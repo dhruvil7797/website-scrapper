@@ -44,6 +44,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       body: JSON.stringify({
         from: `${senderName} <${fromEmail}>`,
         to: [to_email],
+        bcc: ['dhruvil@cloudgenz.com'],
         reply_to: replyTo,
         subject,
         html: body_html,
