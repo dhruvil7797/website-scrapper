@@ -182,7 +182,7 @@ export default function Campaigns() {
                   }`}>{c.status}</span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {(c.status === 'pending' || c.status === 'completed') && (
+                  {(c.status === 'pending' || c.status === 'completed' || c.status === 'failed') && (
                     <button
                       onClick={() => handleDiscover(c.id)}
                       disabled={running === c.id}
