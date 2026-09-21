@@ -57,7 +57,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   if (!campaign) return error('Campaign not found', 404);
 
-  const searchTerms: string[] = JSON.parse(campaign.search_terms);
+  const searchTerms: string[] = (() => {
+    try { return JSON.parse(campaign.search_terms); }
+    catch { return campaign.search_terms.split(',').map((s: string) => s.trim()).filter(Boolean); }
+  })();
+  if (!searchTerms.length) return error('Niche has no search terms');
   const query = `${searchTerms[0]} in ${campaign.location}`;
 
   // Update campaign status
