@@ -47,6 +47,7 @@ export const onRequestDelete: PagesFunction<Env, 'id'> = async (context) => {
   if (authErr) return authErr;
 
   const id = context.params.id as string;
+  await context.env.DB.prepare('DELETE FROM sms_log WHERE prospect_id = ?').bind(id).run();
   await context.env.DB.prepare('DELETE FROM email_log WHERE prospect_id = ?').bind(id).run();
   await context.env.DB.prepare('DELETE FROM prospects WHERE id = ?').bind(id).run();
   return json({ deleted: true });
