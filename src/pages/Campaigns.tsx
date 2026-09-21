@@ -8,10 +8,14 @@ export default function Campaigns() {
   const [showForm, setShowForm] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', niche_id: '', location: '', country: 'US', requested_count: 50 });
+  const [showAddNiche, setShowAddNiche] = useState(false);
+  const [nicheForm, setNicheForm] = useState({ name: '', category: '', search_terms: '' });
+
+  const loadNiches = () => api.get<Niche[]>('/niches').then(setNiches).catch(console.error);
 
   useEffect(() => {
     api.get<Campaign[]>('/campaigns').then(setCampaigns).catch(console.error);
-    api.get<Niche[]>('/niches').then(setNiches).catch(console.error);
+    loadNiches();
   }, []);
 
   const nichesByCategory = niches.reduce<Record<string, Niche[]>>((acc, n) => {
@@ -25,6 +29,15 @@ export default function Campaigns() {
     setCampaigns([campaign, ...campaigns]);
     setShowForm(false);
     setForm({ name: '', niche_id: '', location: '', country: 'US', requested_count: 50 });
+  };
+
+  const handleAddNiche = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nicheForm.name || !nicheForm.category) return;
+    await api.post('/niches/manage', nicheForm);
+    setShowAddNiche(false);
+    setNicheForm({ name: '', category: '', search_terms: '' });
+    loadNiches();
   };
 
   const handleDiscover = async (campaignId: string) => {
@@ -44,10 +57,43 @@ export default function Campaigns() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Campaigns</h1>
-        <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-          + New Campaign
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowAddNiche(!showAddNiche)} className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+            + Add Niche
+          </button>
+          <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+            + New Campaign
+          </button>
+        </div>
       </div>
+
+      {showAddNiche && (
+        <form onSubmit={handleAddNiche} className="bg-white rounded-lg border border-purple-200 p-4 mb-6 space-y-3">
+          <h3 className="text-sm font-medium text-gray-900">Add New Niche Category</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Name *</label>
+              <input value={nicheForm.name} onChange={e => setNicheForm({ ...nicheForm, name: e.target.value })} placeholder="Immigration Agency" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Category *</label>
+              <input value={nicheForm.category} onChange={e => setNicheForm({ ...nicheForm, category: e.target.value })} placeholder="Professional" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" list="niche-categories" required />
+              <datalist id="niche-categories">
+                {[...new Set(niches.map(n => n.category))].sort().map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Search Terms (comma-separated)</label>
+              <input value={nicheForm.search_terms} onChange={e => setNicheForm({ ...nicheForm, search_terms: e.target.value })} placeholder="immigration consultant, visa agent" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="bg-purple-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-purple-700">Add Niche</button>
+            <button type="button" onClick={() => setShowAddNiche(false)} className="text-gray-500 px-3 py-1.5 text-sm">Cancel</button>
+          </div>
+          <p className="text-xs text-gray-400">Current count: {niches.length} niches. Category will auto-suggest from existing ones.</p>
+        </form>
+      )}
 
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white rounded-lg border border-gray-200 p-5 mb-6 space-y-4">
