@@ -37,6 +37,7 @@ function extractAddress(components: PlaceResult['addressComponents']): { city: s
   let city = '', state = '', postal = '';
   if (!components) return { city, state, postal };
   for (const c of components) {
+    if (!c.types) continue;
     if (c.types.includes('locality')) city = c.longText;
     if (c.types.includes('administrative_area_level_1')) state = c.longText;
     if (c.types.includes('postal_code')) postal = c.longText;
