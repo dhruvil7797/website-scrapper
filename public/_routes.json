@@ -1,5 +1,5 @@
 {
   "version": 1,
   "include": ["/*"],
-  "exclude": []
+  "exclude": ["/offer.html", "/niche-data.json"]
 }

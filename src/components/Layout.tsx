@@ -5,6 +5,7 @@ const links = [
   { to: '/campaigns', label: 'Campaigns', icon: '🎯' },
   { to: '/prospects', label: 'Prospects', icon: '👥' },
   { to: '/templates', label: 'Templates', icon: '✉️' },
+  { to: '/unsubscribed', label: 'Unsubscribed', icon: '🚫' },
   { to: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 

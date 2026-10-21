@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
-import type { Prospect, Niche, Campaign, EmailLogEntry, SmsLogEntry } from '@/types';
+import type { Prospect, Niche, Campaign, EmailLogEntry, SmsLogEntry, ProspectTier } from '@/types';
 
 interface EditForm {
   business_name: string; phone: string; email: string; website_url: string;
@@ -11,11 +11,34 @@ interface EditForm {
 
 const emptyForm: EditForm = { business_name: '', phone: '', email: '', website_url: '', owner_name: '', address: '', city: '', state_province: '', postal_code: '', notes: '', niche_id: '', campaign_id: '' };
 
+const TIER_ORDER: Record<string, number> = { hot: 0, warm: 1, cold: 2, skip: 3 };
+
+function getTier(p: Prospect): ProspectTier {
+  if (p.tier) return p.tier;
+  if (p.status === 'skipped') return 'skip';
+  if (p.quality_score >= 60) return 'hot';
+  if (p.quality_score >= 30) return 'warm';
+  return 'cold';
+}
+
+function TierBadge({ tier }: { tier: ProspectTier }) {
+  switch (tier) {
+    case 'hot':
+      return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">🔥 Hot</span>;
+    case 'warm':
+      return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">☀️ Warm</span>;
+    case 'cold':
+      return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-600">❄️ Cold</span>;
+    case 'skip':
+      return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400 line-through">Skip</span>;
+  }
+}
+
 export default function Prospects() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [niches, setNiches] = useState<Niche[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [filters, setFilters] = useState({ status: '', niche_id: '', campaign_id: '', min_score: 0, q: '' });
+  const [filters, setFilters] = useState({ status: '', niche_id: '', campaign_id: '', min_score: 0, q: '', tier: '' as '' | ProspectTier });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Prospect | null>(null);
   const [emailHistory, setEmailHistory] = useState<EmailLogEntry[]>([]);
@@ -25,8 +48,8 @@ export default function Prospects() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pageSpeedData, setPageSpeedData] = useState<{ score: number; fcp: string | null; lcp: string | null; cls: string | null; tbt: string | null; si: string | null; issues: string[]; report_url?: string } | null>(null);
-  const [pageSpeedUrl, setPageSpeedUrl] = useState('');
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [enrichProgress, setEnrichProgress] = useState<{ current: number; total: number; running: boolean } | null>(null);
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
@@ -42,6 +65,19 @@ export default function Prospects() {
   useEffect(() => { api.get<Niche[]>('/niches').then(setNiches).catch(console.error); }, []);
   useEffect(() => { api.get<Campaign[]>('/campaigns').then(setCampaigns).catch(console.error); }, []);
 
+  // Sort and filter by tier
+  const sortedProspects = useMemo(() => {
+    let filtered = prospects.map(p => ({ ...p, _tier: getTier(p) }));
+    if (filters.tier) {
+      filtered = filtered.filter(p => p._tier === filters.tier);
+    }
+    return filtered.sort((a, b) => {
+      const tierDiff = (TIER_ORDER[a._tier] ?? 99) - (TIER_ORDER[b._tier] ?? 99);
+      if (tierDiff !== 0) return tierDiff;
+      return b.quality_score - a.quality_score;
+    });
+  }, [prospects, filters.tier]);
+
   const loadEmailHistory = (id: string) => {
     api.get<EmailLogEntry[]>(`/prospects/${id}/emails`).then(setEmailHistory).catch(() => setEmailHistory([]));
     api.get<SmsLogEntry[]>(`/prospects/${id}/sms`).then(setSmsHistory).catch(() => setSmsHistory([]));
@@ -49,8 +85,6 @@ export default function Prospects() {
 
   const selectDetail = (p: Prospect) => {
     setDetail(p);
-    setPageSpeedUrl('');
-    // Load stored PageSpeed data if available
     if (p.pagespeed_mobile && p.pagespeed_data) {
       try { setPageSpeedData(JSON.parse(p.pagespeed_data)); } catch { setPageSpeedData(null); }
     } else {
@@ -86,38 +120,54 @@ export default function Prospects() {
     load();
   };
 
-  const scrapeEmail = async (id: string) => {
-    setActionLoading('scrape_' + id);
+  const analyzePageSpeed = async (id: string) => {
+    setActionLoading('speed_' + id);
     try {
-      const result = await api.post<{ email: string | null; all_found: string[] }>('/scrape-email', { prospect_id: id });
-      if (result.email) {
-        alert(`Found: ${result.email}${result.all_found.length > 1 ? ` (+ ${result.all_found.length - 1} more)` : ''}`);
-      } else {
-        alert('No email found on their website');
-      }
+      const result = await api.post<{ score: number; fcp: string | null; lcp: string | null; cls: string | null; tbt: string | null; si: string | null; issues: string[]; report_url: string }>('/pagespeed', { prospect_id: id });
+      setPageSpeedData(result);
       load();
       if (detail?.id === id) {
         const updated = await api.get<Prospect>(`/prospects/${id}`);
         setDetail(updated);
       }
-    } catch (e) { alert(e instanceof Error ? e.message : 'Scrape failed'); }
+    } catch (e) { alert(e instanceof Error ? e.message : 'PageSpeed analysis failed — try again'); }
     setActionLoading(null);
   };
 
-  const pullPageSpeed = async (id: string) => {
-    if (!pageSpeedUrl.includes('pagespeed.web.dev')) { alert('Paste a pagespeed.web.dev report URL'); return; }
-    setActionLoading('speed_' + id);
+  // Enrich a single prospect (email scraping + website audit + re-score)
+  const enrichProspect = async (id: string) => {
+    setActionLoading('enrich_' + id);
     try {
-      const result = await api.post<{ score: number; fcp: string | null; lcp: string | null; cls: string | null; tbt: string | null; si: string | null; issues: string[]; report_url: string }>('/pagespeed', { prospect_id: id, report_url: pageSpeedUrl });
-      setPageSpeedData(result);
-      setPageSpeedUrl('');
+      await api.post<{ enriched: boolean; email: string | null; website_issues: string[]; score: number; tier: string; reasons: string[] }>('/enrich', { prospect_id: id });
       load();
       if (detail?.id === id) {
         const updated = await api.get<Prospect>(`/prospects/${id}`);
         setDetail(updated);
       }
-    } catch (e) { alert(e instanceof Error ? e.message : 'Pull failed — make sure the report has finished loading on pagespeed.web.dev'); }
+    } catch (e) { alert(e instanceof Error ? e.message : 'Enrich failed'); }
     setActionLoading(null);
+  };
+
+  // Enrich all prospects with websites that haven't been enriched yet
+  // Calls /api/enrich one at a time from the frontend — no CF timeout issues
+  const enrichAll = async () => {
+    const unenriched = prospects.filter(p => p.website_url && !p.website_issues);
+    if (unenriched.length === 0) { alert('All prospects are already enriched'); return; }
+    if (!confirm(`Enrich ${unenriched.length} prospects? This will scrape emails and audit websites one by one.`)) return;
+
+    setEnrichProgress({ current: 0, total: unenriched.length, running: true });
+
+    for (let i = 0; i < unenriched.length; i++) {
+      setEnrichProgress({ current: i + 1, total: unenriched.length, running: true });
+      try {
+        await api.post('/enrich', { prospect_id: unenriched[i].id });
+      } catch {
+        // Skip failures, continue with next
+      }
+    }
+
+    setEnrichProgress(null);
+    load(); // Refresh the full list with updated data
   };
 
   const handleAddProspect = async (e: React.FormEvent) => {
@@ -155,6 +205,18 @@ export default function Prospects() {
 
   const scoreColor = (s: number) => s >= 60 ? 'text-green-600' : s >= 30 ? 'text-yellow-600' : 'text-red-500';
 
+  const parseReasons = (reasons: string | null): string[] => {
+    if (!reasons) return [];
+    try { const parsed = JSON.parse(reasons); return Array.isArray(parsed) ? parsed : [reasons]; }
+    catch { return reasons.split('\n').filter(Boolean); }
+  };
+
+  const parseWebsiteIssues = (issues: string | null): string[] => {
+    if (!issues) return [];
+    try { const parsed = JSON.parse(issues); return Array.isArray(parsed) ? parsed : [issues]; }
+    catch { return issues.split('\n').filter(Boolean); }
+  };
+
   const formFields: { key: string; label: string; required?: boolean }[] = [
     { key: 'business_name', label: 'Business Name*', required: true },
     { key: 'owner_name', label: 'Owner Name' },
@@ -180,8 +242,24 @@ export default function Prospects() {
               </>
             )}
             <button onClick={() => { setShowAddForm(true); setEditingProspect({ ...emptyForm }); }} className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700">+ Add Prospect</button>
+            <button onClick={enrichAll} disabled={!!enrichProgress?.running} className="bg-purple-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
+              {enrichProgress?.running ? `🔄 Enriching ${enrichProgress.current}/${enrichProgress.total}...` : '🔍 Enrich All'}
+            </button>
           </div>
         </div>
+
+        {/* Enrich progress bar */}
+        {enrichProgress?.running && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span>Enriching prospects (scraping emails + auditing websites)...</span>
+              <span>{enrichProgress.current}/{enrichProgress.total}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-purple-600 h-2 rounded-full transition-all duration-300" style={{ width: `${(enrichProgress.current / enrichProgress.total) * 100}%` }} />
+            </div>
+          </div>
+        )}
 
         {/* Add form */}
         {showAddForm && editingProspect && (
@@ -238,6 +316,13 @@ export default function Prospects() {
             <option value="">All statuses</option>
             {['new', 'contacted', 'replied', 'won', 'lost', 'skipped'].map(s => <option key={s} value={s}>{s}</option>)}
           </select>
+          <select value={filters.tier} onChange={e => setFilters({ ...filters, tier: e.target.value as '' | ProspectTier })} className="px-3 py-1.5 border border-gray-300 rounded-md text-sm">
+            <option value="">All tiers</option>
+            <option value="hot">🔥 Hot</option>
+            <option value="warm">☀️ Warm</option>
+            <option value="cold">❄️ Cold</option>
+            <option value="skip">⏭️ Skip</option>
+          </select>
           <select value={filters.niche_id} onChange={e => setFilters({ ...filters, niche_id: e.target.value })} className="px-3 py-1.5 border border-gray-300 rounded-md text-sm">
             <option value="">All niches</option>
             {niches.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
@@ -247,6 +332,12 @@ export default function Prospects() {
             {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <input type="number" placeholder="Min score" min={0} max={100} value={filters.min_score || ''} onChange={e => setFilters({ ...filters, min_score: Number(e.target.value) || 0 })} className="px-3 py-1.5 border border-gray-300 rounded-md text-sm w-24" />
+          <button
+            onClick={() => setFilters({ ...filters, tier: filters.tier === 'hot' ? '' : 'hot' })}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${filters.tier === 'hot' ? 'bg-orange-600 text-white' : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'}`}
+          >
+            🔥 Show Hot Leads Only
+          </button>
         </div>
 
         {/* Table */}
@@ -254,8 +345,9 @@ export default function Prospects() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="w-8 px-3 py-3"><input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(prospects.map(p => p.id)) : new Set())} /></th>
+                <th className="w-8 px-3 py-3"><input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(sortedProspects.map(p => p.id)) : new Set())} /></th>
                 <th className="text-left px-3 py-3 font-medium text-gray-600">Business</th>
+                <th className="text-center px-3 py-3 font-medium text-gray-600">Tier</th>
                 <th className="text-left px-3 py-3 font-medium text-gray-600">City</th>
                 <th className="text-center px-3 py-3 font-medium text-gray-600">Score</th>
                 <th className="text-center px-3 py-3 font-medium text-gray-600">Web</th>
@@ -265,31 +357,35 @@ export default function Prospects() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {prospects.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No prospects found.</td></tr>
-              ) : prospects.map(p => (
-                <tr key={p.id} className={`hover:bg-gray-50 cursor-pointer ${detail?.id === p.id ? 'bg-blue-50' : ''}`} onClick={() => selectDetail(p)}>
-                  <td className="px-3 py-3" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} /></td>
-                  <td className="px-3 py-3"><p className="font-medium text-gray-900 truncate max-w-[200px]">{p.business_name}</p><p className="text-xs text-gray-400">{p.niche_name || p.niche_id}</p></td>
-                  <td className="px-3 py-3 text-gray-600">{p.city}{p.state_province ? `, ${p.state_province}` : ''}</td>
-                  <td className={`px-3 py-3 text-center font-semibold ${scoreColor(p.quality_score)}`}>{p.quality_score}</td>
-                  <td className="px-3 py-3 text-center">{p.has_website ? '🌐' : '❌'}</td>
-                  <td className="px-3 py-3 text-center">{p.email ? '✅' : '—'}</td>
-                  <td className="px-3 py-3 text-center">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === 'new' ? 'bg-blue-100 text-blue-700' : p.status === 'contacted' ? 'bg-yellow-100 text-yellow-700' : p.status === 'replied' ? 'bg-green-100 text-green-700' : p.status === 'won' ? 'bg-green-200 text-green-800' : p.status === 'lost' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
-                  </td>
-                  <td className="px-3 py-3 text-right space-x-1" onClick={e => e.stopPropagation()}>
-                    <Link to={`/compose/${p.id}?mode=email`} className="text-blue-600 hover:text-blue-700 text-xs">✉️</Link>
-                    <Link to={`/compose/${p.id}?mode=sms`} className="text-green-600 hover:text-green-700 text-xs">📱</Link>
-                    <button onClick={() => startEdit(p)} className="text-gray-400 hover:text-gray-600 text-xs">✏️</button>
-                    <button onClick={() => deleteProspect(p.id)} className="text-red-400 hover:text-red-600 text-xs">🗑️</button>
-                  </td>
-                </tr>
-              ))}
+              {sortedProspects.length === 0 ? (
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No prospects found.</td></tr>
+              ) : sortedProspects.map(p => {
+                const tier = getTier(p);
+                return (
+                  <tr key={p.id} className={`hover:bg-gray-50 cursor-pointer ${detail?.id === p.id ? 'bg-blue-50' : ''} ${tier === 'skip' ? 'opacity-50' : ''}`} onClick={() => selectDetail(p)}>
+                    <td className="px-3 py-3" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} /></td>
+                    <td className="px-3 py-3"><p className={`font-medium text-gray-900 truncate max-w-[200px] ${tier === 'skip' ? 'line-through' : ''}`}>{p.business_name}</p><p className="text-xs text-gray-400">{p.niche_name || p.niche_id}</p></td>
+                    <td className="px-3 py-3 text-center"><TierBadge tier={tier} /></td>
+                    <td className="px-3 py-3 text-gray-600">{p.city}{p.state_province ? `, ${p.state_province}` : ''}</td>
+                    <td className={`px-3 py-3 text-center font-semibold ${scoreColor(p.quality_score)}`}>{p.quality_score}</td>
+                    <td className="px-3 py-3 text-center">{p.has_website ? '🌐' : '❌'}</td>
+                    <td className="px-3 py-3 text-center">{p.opted_out ? '🚫' : p.email ? '✅' : '—'}</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === 'new' ? 'bg-blue-100 text-blue-700' : p.status === 'contacted' ? 'bg-yellow-100 text-yellow-700' : p.status === 'replied' ? 'bg-green-100 text-green-700' : p.status === 'won' ? 'bg-green-200 text-green-800' : p.status === 'lost' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
+                    </td>
+                    <td className="px-3 py-3 text-right space-x-1" onClick={e => e.stopPropagation()}>
+                      <Link to={`/compose/${p.id}?mode=email`} className="text-blue-600 hover:text-blue-700 text-xs">✉️</Link>
+                      <Link to={`/compose/${p.id}?mode=sms`} className="text-green-600 hover:text-green-700 text-xs">📱</Link>
+                      <button onClick={() => startEdit(p)} className="text-gray-400 hover:text-gray-600 text-xs">✏️</button>
+                      <button onClick={() => deleteProspect(p.id)} className="text-red-400 hover:text-red-600 text-xs">🗑️</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-gray-400 mt-2">{prospects.length} prospects shown</p>
+        <p className="text-xs text-gray-400 mt-2">{sortedProspects.length} prospects shown{filters.tier ? ` (filtered: ${filters.tier})` : ''}</p>
       </div>
 
       {/* Detail panel */}
@@ -300,8 +396,12 @@ export default function Prospects() {
             <button onClick={() => setDetail(null)} className="text-gray-400 hover:text-gray-600">✕</button>
           </div>
 
+          <div className="flex items-center gap-2">
+            <TierBadge tier={getTier(detail)} />
+            <span className={`font-semibold ${scoreColor(detail.quality_score)}`}>{detail.quality_score}/100</span>
+          </div>
+
           <div className="space-y-2 text-sm">
-            <div><span className="text-gray-500">Score:</span> <span className={`font-semibold ${scoreColor(detail.quality_score)}`}>{detail.quality_score}/100</span></div>
             {detail.phone && <div><span className="text-gray-500">Phone:</span> <a href={`tel:${detail.phone}`} className="text-blue-600">{detail.phone}</a></div>}
             {detail.email && <div><span className="text-gray-500">Email:</span> <a href={`mailto:${detail.email}`} className="text-blue-600 break-all">{detail.email}</a></div>}
             {detail.website_url && <div><span className="text-gray-500">Website:</span> <a href={detail.website_url} target="_blank" rel="noopener" className="text-blue-600 truncate block">{detail.website_url}</a></div>}
@@ -313,19 +413,14 @@ export default function Prospects() {
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-1.5">
-            {detail.website_url && !detail.email && (
-              <button onClick={() => scrapeEmail(detail.id)} disabled={actionLoading === 'scrape_' + detail.id} className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 disabled:opacity-50">
-                {actionLoading === 'scrape_' + detail.id ? '⏳ Scraping...' : '📧 Find Email'}
+            {detail.website_url && (
+              <button onClick={() => enrichProspect(detail.id)} disabled={actionLoading === 'enrich_' + detail.id} className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 disabled:opacity-50">
+                {actionLoading === 'enrich_' + detail.id ? '⏳ Enriching...' : '🔍 Enrich (Email + Audit)'}
               </button>
             )}
             {detail.website_url && (
-              <a href={`https://pagespeed.web.dev/analysis/${encodeURIComponent(detail.website_url)}?form_factor=mobile`} target="_blank" rel="noopener" className="text-xs px-2 py-1 bg-orange-50 text-orange-700 rounded hover:bg-orange-100 inline-block">
-                ⚡ PageSpeed Report
-              </a>
-            )}
-            {detail.website_url && (
-              <button onClick={() => pullPageSpeed(detail.id)} disabled={actionLoading === 'speed_' + detail.id} className="text-xs px-2 py-1 bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100 disabled:opacity-50">
-                {actionLoading === 'speed_' + detail.id ? '⏳ Pulling...' : '📊 Pull Speed Data'}
+              <button onClick={() => analyzePageSpeed(detail.id)} disabled={actionLoading === 'speed_' + detail.id} className="text-xs px-2 py-1 bg-orange-50 text-orange-700 rounded hover:bg-orange-100 disabled:opacity-50">
+                {actionLoading === 'speed_' + detail.id ? '⏳ Analyzing (~20s)...' : '⚡ PageSpeed'}
               </button>
             )}
             {detail.website_url && (
@@ -336,21 +431,6 @@ export default function Prospects() {
             <button onClick={() => startEdit(detail)} className="text-xs px-2 py-1 bg-gray-50 text-gray-700 rounded hover:bg-gray-100">✏️ Edit</button>
             <button onClick={() => deleteProspect(detail.id)} className="text-xs px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100">🗑️ Delete</button>
           </div>
-
-          {/* PageSpeed URL input */}
-          {detail.website_url && (
-            <div className="flex gap-1">
-              <input
-                value={pageSpeedUrl}
-                onChange={e => setPageSpeedUrl(e.target.value)}
-                placeholder="Paste pagespeed.web.dev URL..."
-                className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs"
-              />
-              <button onClick={() => pullPageSpeed(detail.id)} disabled={!pageSpeedUrl || actionLoading === 'speed_' + detail.id} className="px-2 py-1 bg-yellow-50 text-yellow-700 rounded text-xs hover:bg-yellow-100 disabled:opacity-50 whitespace-nowrap">
-                {actionLoading === 'speed_' + detail.id ? '⏳' : '📊 Pull'}
-              </button>
-            </div>
-          )}
 
           {/* PageSpeed details */}
           {pageSpeedData && (
@@ -375,6 +455,21 @@ export default function Prospects() {
                   </ul>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Website Issues (red-flagged) */}
+          {detail.website_issues && parseWebsiteIssues(detail.website_issues).length > 0 && (
+            <div className="border border-red-200 rounded-md p-3 bg-red-50">
+              <p className="text-xs font-semibold text-red-800 mb-1">🚩 Website Issues</p>
+              <ul className="text-xs text-red-700 space-y-0.5">
+                {parseWebsiteIssues(detail.website_issues).map((issue, i) => (
+                  <li key={i} className="flex items-start gap-1">
+                    <span className="text-red-500 mt-0.5">⚠️</span>
+                    <span>{issue}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -403,6 +498,18 @@ export default function Prospects() {
                   </div>
                 ))}
               </div>
+
+              {/* Reasons under score breakdown */}
+              {detail.reasons && parseReasons(detail.reasons).length > 0 && (
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <p className="text-xs text-gray-500 mb-1">Scoring Reasons</p>
+                  <ul className="text-xs text-gray-600 space-y-0.5">
+                    {parseReasons(detail.reasons).map((reason, i) => (
+                      <li key={i}>• {reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 
@@ -413,16 +520,25 @@ export default function Prospects() {
             </select>
           </div>
 
-          {detail.email && (
-            <Link to={`/compose/${detail.id}?mode=email`} className="block w-full text-center bg-blue-600 text-white py-2 rounded text-sm font-medium hover:bg-blue-700">
-              ✉️ Compose Email
-            </Link>
-          )}
+          {detail.opted_out ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+              <p className="text-red-600 font-semibold text-sm">🚫 Opted Out</p>
+              <p className="text-red-500 text-xs mt-1">This prospect unsubscribed. Sending is blocked.</p>
+            </div>
+          ) : (
+            <>
+              {detail.email && (
+                <Link to={`/compose/${detail.id}?mode=email`} className="block w-full text-center bg-blue-600 text-white py-2 rounded text-sm font-medium hover:bg-blue-700">
+                  ✉️ Compose Email
+                </Link>
+              )}
 
-          <div className="flex gap-2">
-            <Link to={`/compose/${detail.id}?mode=email`} className="flex-1 text-center bg-blue-50 text-blue-700 py-1.5 rounded text-xs font-medium hover:bg-blue-100">✉️ Email</Link>
-            <Link to={`/compose/${detail.id}?mode=sms`} className="flex-1 text-center bg-green-50 text-green-700 py-1.5 rounded text-xs font-medium hover:bg-green-100">📱 SMS</Link>
-          </div>
+              <div className="flex gap-2">
+                <Link to={`/compose/${detail.id}?mode=email`} className="flex-1 text-center bg-blue-50 text-blue-700 py-1.5 rounded text-xs font-medium hover:bg-blue-100">✉️ Email</Link>
+                <Link to={`/compose/${detail.id}?mode=sms`} className="flex-1 text-center bg-green-50 text-green-700 py-1.5 rounded text-xs font-medium hover:bg-green-100">📱 SMS</Link>
+              </div>
+            </>
+          )}
 
           {/* Email history */}
           {emailHistory.length > 0 && (

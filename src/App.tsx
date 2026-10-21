@@ -7,6 +7,7 @@ import Prospects from './pages/Prospects';
 import Compose from './pages/Compose';
 import Templates from './pages/Templates';
 import Settings from './pages/Settings';
+import Unsubscribed from './pages/Unsubscribed';
 import Login from './pages/Login';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/compose/:prospectId" element={<Compose />} />
         <Route path="/templates" element={<Templates />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/unsubscribed" element={<Unsubscribed />} />
       </Route>
     </Routes>
   );

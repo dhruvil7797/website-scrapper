@@ -30,6 +30,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const replyTo = settings.reply_to_email || fromEmail;
   const senderName = settings.sender_name || 'CloudGenZ';
 
+  // Append unsubscribe footer (generic, no prospect ID)
+  const unsubscribeFooter = `<div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af;">If you no longer wish to receive these emails, please reply with "unsubscribe".</div>`;
+  const finalHtml = body_html + unsubscribeFooter;
+
   let resendId = '';
   let status = 'sent';
   let errorMessage = '';
@@ -47,7 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         bcc: ['dhruvil@cloudgenz.com'],
         reply_to: replyTo,
         subject,
-        html: body_html,
+        html: finalHtml,
         text: body_text,
       }),
     });
@@ -70,7 +74,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   await context.env.DB.prepare(
     `INSERT INTO email_log (id, prospect_id, template_id, to_address, subject, body_preview, body_html, body_text, status, error_message, resend_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(logId, 'direct_' + nanoid(6), template_id || null, to_email, subject, body_text.substring(0, 200), body_html, body_text, status, errorMessage || null, resendId || null).run();
+  ).bind(logId, 'direct_' + nanoid(6), template_id || null, to_email, subject, body_text.substring(0, 200), finalHtml, body_text, status, errorMessage || null, resendId || null).run();
 
   if (template_id) {
     await context.env.DB.prepare('UPDATE email_templates SET usage_count = usage_count + 1 WHERE id = ?').bind(template_id).run();

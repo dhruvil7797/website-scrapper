@@ -1,6 +1,7 @@
 export type ProspectStatus = 'new' | 'contacted' | 'replied' | 'won' | 'lost' | 'skipped';
 export type CampaignStatus = 'pending' | 'running' | 'completed' | 'failed';
 export type TemplateCategory = 'no_website' | 'outdated' | 'missing_features' | 'slow' | 'no_presence' | 'general';
+export type ProspectTier = 'hot' | 'warm' | 'cold' | 'skip';
 
 export interface Niche {
   id: string;
@@ -60,6 +61,10 @@ export interface Prospect {
   created_at: string;
   updated_at: string;
   niche_name?: string;
+  tier: ProspectTier;
+  reasons: string | null;
+  website_issues: string | null;
+  opted_out: number;
 }
 
 export interface EmailTemplate {

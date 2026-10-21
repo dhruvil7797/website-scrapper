@@ -1,5 +1,8 @@
 import { json, error, requireAuth, nanoid } from '../_shared';
 import type { Env } from '../_shared';
+import { scoreProspect } from './score';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface PlaceResult {
   id: string;
@@ -16,22 +19,25 @@ interface PlaceResult {
   }>;
 }
 
-function scoreProspect(p: { website_url: string | null; google_rating: number | null; google_review_count: number | null; email: string | null; pagespeed_mobile: number | null }): { score: number; breakdown: Record<string, number> } {
-  const b: Record<string, number> = {};
-
-  if (!p.website_url) b.no_website = 30;
-  if (p.google_rating && p.google_rating >= 4.0) b.high_rating = 10;
-  if (p.google_review_count && p.google_review_count >= 10) b.active_reviews = 5;
-  if (p.google_review_count && p.google_review_count < 200) b.local_business = 5;
-  if (p.google_review_count && p.google_review_count > 500) b.likely_chain = -15;
-  if (p.google_rating && p.google_rating < 3.0) b.low_rating = -10;
-
-  // Base score for having data
-  b.base = 20;
-
-  const score = Math.max(0, Math.min(100, Object.values(b).reduce((a, c) => a + c, 0)));
-  return { score, breakdown: b };
+interface DiscoveryResult {
+  discovered: number;
+  duplicates: number;
+  skipped_chains: number;
+  skipped_types: number;
+  hot_leads: number;
+  unenriched: number;
 }
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const CHAIN_REVIEW_THRESHOLD = 500;
+
+const SKIP_GOOGLE_TYPES = new Set([
+  'department_store', 'shopping_mall', 'supermarket', 'gas_station',
+  'convenience_store', 'grocery_or_supermarket',
+]);
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function extractAddress(components: PlaceResult['addressComponents']): { city: string; state: string; postal: string } {
   let city = '', state = '', postal = '';
@@ -45,6 +51,65 @@ function extractAddress(components: PlaceResult['addressComponents']): { city: s
   return { city, state, postal };
 }
 
+function shouldSkipPlace(place: PlaceResult): 'chain' | 'type' | null {
+  if (place.userRatingCount && place.userRatingCount >= CHAIN_REVIEW_THRESHOLD) return 'chain';
+  if (place.types) {
+    for (const t of place.types) {
+      if (SKIP_GOOGLE_TYPES.has(t)) return 'type';
+    }
+  }
+  return null;
+}
+
+// ─── Google Places Search (single query, handles pagination) ─────────────────
+
+async function searchPlaces(
+  query: string,
+  apiKey: string,
+  maxResults: number,
+): Promise<PlaceResult[]> {
+  const allPlaces: PlaceResult[] = [];
+  let pageToken: string | undefined;
+
+  while (allPlaces.length < maxResults) {
+    const batchSize = Math.min(20, maxResults - allPlaces.length);
+    const body: Record<string, unknown> = {
+      textQuery: query,
+      maxResultCount: batchSize,
+      languageCode: 'en',
+    };
+    if (pageToken) body.pageToken = pageToken;
+
+    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.types,places.addressComponents,nextPageToken',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      console.error('Places API error:', await res.text());
+      break;
+    }
+
+    const data = await res.json() as { places?: PlaceResult[]; nextPageToken?: string };
+    if (!data.places || data.places.length === 0) break;
+
+    allPlaces.push(...data.places);
+    pageToken = data.nextPageToken;
+    if (!pageToken) break;
+  }
+
+  return allPlaces;
+}
+
+// ─── Main Handler ────────────────────────────────────────────────────────────
+// Phase 1: FAST discovery — Google Places search + scoring + insert.
+// No email scraping, no website audit (those happen in /api/enrich).
+
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const authErr = requireAuth(context);
   if (authErr) return authErr;
@@ -53,8 +118,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!campaign_id) return error('campaign_id required');
 
   const campaign = await context.env.DB.prepare(
-    `SELECT c.*, n.search_terms, n.name as niche_name FROM campaigns c JOIN niches n ON c.niche_id = n.id WHERE c.id = ?`
-  ).bind(campaign_id).first<{ id: string; niche_id: string; location: string; requested_count: number; search_terms: string; niche_name: string }>();
+    `SELECT c.*, n.search_terms, n.name as niche_name
+     FROM campaigns c JOIN niches n ON c.niche_id = n.id WHERE c.id = ?`
+  ).bind(campaign_id).first<{
+    id: string; niche_id: string; location: string;
+    requested_count: number; search_terms: string; niche_name: string;
+  }>();
 
   if (!campaign) return error('Campaign not found', 404);
 
@@ -63,84 +132,111 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     catch { return campaign.search_terms.split(',').map((s: string) => s.trim()).filter(Boolean); }
   })();
   if (!searchTerms.length) return error('Niche has no search terms');
-  const query = `${searchTerms[0]} in ${campaign.location}`;
 
-  // Update campaign status
-  await context.env.DB.prepare(`UPDATE campaigns SET status = 'running' WHERE id = ?`).bind(campaign_id).run();
+  await context.env.DB.prepare(
+    `UPDATE campaigns SET status = 'running' WHERE id = ?`
+  ).bind(campaign_id).run();
 
-  let discovered = 0;
-  let duplicates = 0;
-  let pageToken: string | undefined;
+  const result: DiscoveryResult = {
+    discovered: 0,
+    duplicates: 0,
+    skipped_chains: 0,
+    skipped_types: 0,
+    hot_leads: 0,
+    unenriched: 0,
+  };
+
+  const seenPlaceIds = new Set<string>();
 
   try {
-    // Fetch up to requested_count using pagination
-    while (discovered < campaign.requested_count) {
-      const maxResults = Math.min(20, campaign.requested_count - discovered);
-      const body: Record<string, unknown> = { textQuery: query, maxResultCount: maxResults, languageCode: 'en' };
-      if (pageToken) body.pageToken = pageToken;
+    // ── MULTI-TERM SEARCH: iterate ALL niche search terms ──
+    for (const term of searchTerms) {
+      if (result.discovered >= campaign.requested_count) break;
 
-      const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': context.env.GOOGLE_API_KEY,
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.types,places.addressComponents,nextPageToken',
-        },
-        body: JSON.stringify(body),
-      });
+      const query = `${term} in ${campaign.location}`;
+      const remaining = campaign.requested_count - result.discovered;
+      const places = await searchPlaces(query, context.env.GOOGLE_API_KEY, remaining);
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error('Places API error:', errText);
-        break;
-      }
+      for (const place of places) {
+        if (result.discovered >= campaign.requested_count) break;
 
-      const data = await res.json() as { places?: PlaceResult[]; nextPageToken?: string };
-      if (!data.places || data.places.length === 0) break;
+        // Cross-term dedup
+        if (seenPlaceIds.has(place.id)) continue;
+        seenPlaceIds.add(place.id);
 
-      for (const place of data.places) {
+        // Smart filtering
+        const skipReason = shouldSkipPlace(place);
+        if (skipReason === 'chain') { result.skipped_chains++; continue; }
+        if (skipReason === 'type') { result.skipped_types++; continue; }
+
         const addr = extractAddress(place.addressComponents);
         const websiteUrl = place.websiteUri || null;
-        const { score, breakdown } = scoreProspect({
+        const typesJson = place.types ? JSON.stringify(place.types) : null;
+
+        // Score with what we have (no email, no pagespeed, no audit yet)
+        const { score, breakdown, tier, reasons } = scoreProspect({
           website_url: websiteUrl,
+          phone: place.nationalPhoneNumber || null,
           google_rating: place.rating || null,
           google_review_count: place.userRatingCount || null,
           email: null,
           pagespeed_mobile: null,
+          website_issues: null,
+          google_types: typesJson,
         });
+
+        if (tier === 'hot') result.hot_leads++;
+        if (websiteUrl) result.unenriched++; // has website = can be enriched later
 
         try {
           await context.env.DB.prepare(
-            `INSERT INTO prospects (id, business_name, phone, website_url, address, city, state_province, postal_code, campaign_id, niche_id, google_place_id, google_rating, google_review_count, google_types, quality_score, score_breakdown, has_website)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            `INSERT INTO prospects
+             (id, business_name, phone, website_url, address, city, state_province, postal_code,
+              campaign_id, niche_id, google_place_id, google_rating, google_review_count,
+              google_types, quality_score, score_breakdown, has_website,
+              tier, reasons)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           ).bind(
-            nanoid(), place.displayName?.text || 'Unknown', place.nationalPhoneNumber || null,
-            websiteUrl, place.formattedAddress || null, addr.city, addr.state, addr.postal,
-            campaign_id, campaign.niche_id, place.id,
-            place.rating || null, place.userRatingCount || null,
-            place.types ? JSON.stringify(place.types) : null,
-            score, JSON.stringify(breakdown), websiteUrl ? 1 : 0,
+            nanoid(),
+            place.displayName?.text || 'Unknown',
+            place.nationalPhoneNumber || null,
+            websiteUrl,
+            place.formattedAddress || null,
+            addr.city,
+            addr.state,
+            addr.postal,
+            campaign_id,
+            campaign.niche_id,
+            place.id,
+            place.rating || null,
+            place.userRatingCount || null,
+            typesJson,
+            score,
+            JSON.stringify(breakdown),
+            websiteUrl ? 1 : 0,
+            tier,
+            reasons.length > 0 ? JSON.stringify(reasons) : null,
           ).run();
-          discovered++;
+          result.discovered++;
         } catch (e: unknown) {
-          // Duplicate google_place_id — skip
-          if (e instanceof Error && e.message.includes('UNIQUE')) { duplicates++; continue; }
+          if (e instanceof Error && e.message.includes('UNIQUE')) {
+            result.duplicates++;
+            continue;
+          }
           throw e;
         }
       }
-
-      pageToken = data.nextPageToken;
-      if (!pageToken) break;
     }
 
-    // Update campaign
     await context.env.DB.prepare(
       `UPDATE campaigns SET status = 'completed', discovered_count = discovered_count + ? WHERE id = ?`
-    ).bind(discovered, campaign_id).run();
+    ).bind(result.discovered, campaign_id).run();
 
-    return json({ discovered, duplicates });
+    return json(result);
   } catch (e) {
-    await context.env.DB.prepare(`UPDATE campaigns SET status = 'failed' WHERE id = ?`).bind(campaign_id).run();
+    await context.env.DB.prepare(
+      `UPDATE campaigns SET status = 'failed' WHERE id = ?`
+    ).bind(campaign_id).run();
     return error(e instanceof Error ? e.message : 'Discovery failed', 500);
   }
 };

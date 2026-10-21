@@ -21,6 +21,17 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return error('to_email, subject, and body_html are required');
   }
 
+  // Check if prospect has opted out
+  if (body.prospect_id) {
+    const prospect = await context.env.DB.prepare(
+      'SELECT opted_out FROM prospects WHERE id = ?'
+    ).bind(body.prospect_id).first<{ opted_out: number }>();
+
+    if (prospect?.opted_out === 1) {
+      return error('This prospect has opted out of emails', 403);
+    }
+  }
+
   // Get sending settings for defaults
   const settingsRows = await context.env.DB.prepare('SELECT key, value FROM settings').all();
   const settings: Record<string, string> = {};
@@ -31,6 +42,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const fromEmail = body.from_email || settings.sending_email || 'hello@cloudgenz.com';
   const replyTo = body.reply_to_email || settings.reply_to_email || fromEmail;
   const senderName = body.sender_name || settings.sender_name || 'CloudGenZ';
+
+  // Append unsubscribe footer
+  const origin = new URL(context.request.url).origin;
+  const unsubscribeUrl = `${origin}/api/unsubscribe?id=${body.prospect_id}`;
+  const unsubscribeFooter = `<div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af;"><a href="${unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline;">Unsubscribe from future emails</a></div>`;
+  const finalHtml = body.body_html + unsubscribeFooter;
 
   // Send via Resend
   let resendId = '';
@@ -50,8 +67,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         bcc: ['dhruvil@cloudgenz.com'],
         reply_to: replyTo,
         subject: body.subject,
-        html: body.body_html,
+        html: finalHtml,
         text: body.body_text,
+        tags: body.prospect_id ? [{ name: 'prospect_id', value: body.prospect_id }] : [],
       }),
     });
 
@@ -73,7 +91,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   await context.env.DB.prepare(
     `INSERT INTO email_log (id, prospect_id, template_id, to_address, subject, body_preview, body_html, body_text, status, error_message, resend_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(logId, body.prospect_id, body.template_id, body.to_email, body.subject, body.body_text.substring(0, 200), body.body_html, body.body_text, status, errorMessage || null, resendId || null).run();
+  ).bind(logId, body.prospect_id, body.template_id, body.to_email, body.subject, body.body_text.substring(0, 200), finalHtml, body.body_text, status, errorMessage || null, resendId || null).run();
 
   // Update prospect
   if (body.prospect_id && status === 'sent') {
